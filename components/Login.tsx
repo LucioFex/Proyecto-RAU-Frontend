@@ -6,18 +6,29 @@ import { EyeSlashedIcon } from './icons/EyeSlashedIcon';
 import { CheckIcon } from './icons/CheckIcon';
 
 interface AuthProps {
-  onLogin: () => void;
-  onRegister: (userData: { name: string; email: string; role: UserRole; }) => void;
+  onLogin: (email: string, password: string) => Promise<void>;
+  onRegister: (userData: { name: string; email: string; password: string; role: UserRole; }) => Promise<void>;
 }
 
-const LoginForm: React.FC<{ onLogin: () => void; onSwitchToRegister: () => void; }> = ({ onLogin, onSwitchToRegister }) => {
-    const [email, setEmail] = useState('jdoe25@ucema.edu.ar');
-    const [password, setPassword] = useState('password123');
+const LoginForm: React.FC<{ onLogin: (email: string, password: string) => Promise<void>; onSwitchToRegister: () => void; }> = ({ onLogin, onSwitchToRegister }) => {
+    const [email, setEmail] = useState('');
+    const [password, setPassword] = useState('');
     const [showPassword, setShowPassword] = useState(false);
-  
-    const handleSubmit = (e: React.FormEvent) => {
+    const [error, setError] = useState('');
+    const [loading, setLoading] = useState(false);
+
+    const handleSubmit = async (e: React.FormEvent) => {
       e.preventDefault();
-      onLogin();
+      setError('');
+      setLoading(true);
+
+      try {
+        await onLogin(email, password);
+      } catch (err: any) {
+        setError(err.message || 'Error al iniciar sesión');
+      } finally {
+        setLoading(false);
+      }
     };
 
     return (
@@ -32,6 +43,8 @@ const LoginForm: React.FC<{ onLogin: () => void; onSwitchToRegister: () => void;
 
                     <div className="mt-8">
                         <form onSubmit={handleSubmit} className="space-y-6">
+                             {error && <div className="bg-red-50 border border-red-200 text-red-600 text-sm p-3 rounded-md">{error}</div>}
+
                              <div>
                                 <label htmlFor="email-login" className="block text-sm font-medium text-slate-700">Email</label>
                                 <div className="mt-1">
@@ -48,7 +61,7 @@ const LoginForm: React.FC<{ onLogin: () => void; onSwitchToRegister: () => void;
                                     </button>
                                 </div>
                             </div>
-                            
+
                             <div className="flex items-center justify-between">
                                 <div className="flex items-center">
                                     <input id="remember-me" name="remember-me" type="checkbox" className="h-4 w-4 text-blue-500 focus:ring-blue-500 border-slate-300 rounded"/>
@@ -60,7 +73,9 @@ const LoginForm: React.FC<{ onLogin: () => void; onSwitchToRegister: () => void;
                             </div>
 
                             <div>
-                                <button type="submit" className="w-full flex justify-center py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500">Login</button>
+                                <button type="submit" disabled={loading} className="w-full flex justify-center py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:bg-blue-300 disabled:cursor-not-allowed">
+                                    {loading ? 'Iniciando sesión...' : 'Login'}
+                                </button>
                             </div>
                             <p className="mt-2 text-center text-sm text-slate-600">
                                 ¿No tenes una cuenta?{' '}
@@ -89,8 +104,9 @@ const RegisterForm: React.FC<{ onRegister: AuthProps['onRegister']; onSwitchToLo
     const [showConfirmPassword, setShowConfirmPassword] = useState(false);
     const [error, setError] = useState('');
     const [success, setSuccess] = useState('');
+    const [loading, setLoading] = useState(false);
 
-    const handleSubmit = (e: React.FormEvent) => {
+    const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
         setError('');
         setSuccess('');
@@ -103,20 +119,28 @@ const RegisterForm: React.FC<{ onRegister: AuthProps['onRegister']; onSwitchToLo
             setError('Debes aceptar los términos y políticas de privacidad.');
             return;
         }
-        
-        onRegister({ name: fullName, email, role });
-        setSuccess('¡Registro exitoso! Ahora puedes iniciar sesión.');
-        
-        // Clear form
-        setFullName('');
-        setEmail('');
-        setPassword('');
-        setConfirmPassword('');
-        setAgreedToTerms(false);
 
-        setTimeout(() => onSwitchToLogin(), 2000);
+        setLoading(true);
+
+        try {
+            await onRegister({ name: fullName, email, password, role });
+            setSuccess('¡Registro exitoso! Ahora puedes iniciar sesión.');
+
+            // Clear form
+            setFullName('');
+            setEmail('');
+            setPassword('');
+            setConfirmPassword('');
+            setAgreedToTerms(false);
+
+            setTimeout(() => onSwitchToLogin(), 2000);
+        } catch (err: any) {
+            setError(err.message || 'Error al registrar usuario');
+        } finally {
+            setLoading(false);
+        }
     };
-    
+
     return (
         <div className="min-h-screen bg-white flex">
             <div className="hidden lg:block relative w-0 flex-1">
@@ -132,9 +156,9 @@ const RegisterForm: React.FC<{ onRegister: AuthProps['onRegister']; onSwitchToLo
                     </div>
                     <div className="mt-8">
                         <form onSubmit={handleSubmit} className="space-y-6">
-                            {error && <p className="text-sm text-red-600 bg-red-50 p-3 rounded-md">{error}</p>}
-                            {success && <p className="text-sm text-green-600 bg-green-50 p-3 rounded-md">{success}</p>}
-                            
+                            {error && <p className="text-sm text-red-600 bg-red-50 p-3 rounded-md border border-red-200">{error}</p>}
+                            {success && <p className="text-sm text-green-600 bg-green-50 p-3 rounded-md border border-green-200">{success}</p>}
+
                             <div>
                                 <label htmlFor="full-name" className="block text-sm font-medium text-slate-700">Full Name</label>
                                 <input id="full-name" type="text" required value={fullName} onChange={e => setFullName(e.target.value)} className="mt-1 appearance-none block w-full px-3 py-2 border border-slate-300 rounded-md shadow-sm placeholder-slate-400 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm"/>
@@ -143,7 +167,7 @@ const RegisterForm: React.FC<{ onRegister: AuthProps['onRegister']; onSwitchToLo
                                 <label htmlFor="email-register" className="block text-sm font-medium text-slate-700">Email</label>
                                 <input id="email-register" type="email" required value={email} onChange={e => setEmail(e.target.value)} className="mt-1 appearance-none block w-full px-3 py-2 border border-slate-300 rounded-md shadow-sm placeholder-slate-400 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm"/>
                             </div>
-                            
+
                             <div className="grid grid-cols-2 gap-3">
                                 <button type="button" onClick={() => setRole('Estudiante')} className={`w-full flex justify-center items-center gap-2 py-2 px-4 border rounded-md shadow-sm text-sm font-medium ${role === 'Estudiante' ? 'bg-blue-600 text-white border-transparent' : 'bg-white text-slate-700 border-slate-300 hover:bg-slate-50'}`}>
                                     {role === 'Estudiante' && <CheckIcon className="h-5 w-5"/>} Soy Estudiante
@@ -172,9 +196,11 @@ const RegisterForm: React.FC<{ onRegister: AuthProps['onRegister']; onSwitchToLo
                                 <input id="terms" name="terms" type="checkbox" checked={agreedToTerms} onChange={e => setAgreedToTerms(e.target.checked)} className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-slate-300 rounded mt-1"/>
                                 <label htmlFor="terms" className="ml-2 block text-sm text-slate-900">I agree to all the <a href="#" className="font-medium text-blue-600 hover:underline">Terms</a> and <a href="#" className="font-medium text-blue-600 hover:underline">Privacy Policies</a></label>
                             </div>
-                            
+
                             <div>
-                                <button type="submit" className="w-full flex justify-center py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500">Creá tu Cuenta</button>
+                                <button type="submit" disabled={loading} className="w-full flex justify-center py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:bg-blue-300 disabled:cursor-not-allowed">
+                                    {loading ? 'Creando cuenta...' : 'Creá tu Cuenta'}
+                                </button>
                             </div>
                             <p className="text-center text-sm text-slate-600">
                                 ¿Ya tenés una cuenta?{' '}
@@ -195,6 +221,6 @@ export const Login: React.FC<AuthProps> = ({ onLogin, onRegister }) => {
   if (view === 'register') {
     return <RegisterForm onRegister={onRegister} onSwitchToLogin={() => setView('login')} />;
   }
-  
+
   return <LoginForm onLogin={onLogin} onSwitchToRegister={() => setView('register')} />;
 };

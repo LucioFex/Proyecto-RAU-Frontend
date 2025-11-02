@@ -11,16 +11,22 @@ import { Login } from './components/Login';
 import { SuccessNotification } from './components/SuccessNotification';
 import { Onboarding, OnboardingData } from './components/Onboarding';
 
+import {
+  authService,
+  communityService,
+  postService,
+  commentService,
+  userService,
+  onboardingService,
+} from './services';
+
 type View = 'home' | 'post' | 'profile';
 
-// Reemplazar con backend de verdad
 function App() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [initialUsers, setUsers] = useState<User[]>([]);
   const [posts, setPosts] = useState<Post[]>([]);
   const [communities, setCommunities] = useState<Community[]>([]);
-
   const [allUsers, setAllUsers] = useState<User[]>([]);
   const [currentUser, setCurrentUser] = useState<User | null>(null);
 
@@ -31,73 +37,108 @@ function App() {
   const [searchQuery, setSearchQuery] = useState('');
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [notification, setNotification] = useState<string | null>(null);
-  
-  useEffect(() => {
-    if(initialUsers.length > 0) {
-      setAllUsers(initialUsers);
-    }
-  }, [initialUsers]);
 
-  const handleLogin = () => {
-    // In a real app, this would validate credentials.
-    // Here we just log in the first user from the list.
-    if (allUsers.length > 0) {
-      setCurrentUser(allUsers[0]);
+  useEffect(() => {
+    const initializeApp = async () => {
+      try {
+        const storedUser = authService.getStoredUser();
+        if (storedUser) {
+          try {
+            const user = await authService.getCurrentUser();
+            setCurrentUser(user);
+          } catch {
+            authService.logout();
+          }
+        }
+      } catch (err) {
+        console.error('Error initializing app:', err);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    initializeApp();
+  }, []);
+
+  useEffect(() => {
+    if (currentUser && currentUser.hasCompletedOnboarding) {
+      loadData();
+    }
+  }, [currentUser?.hasCompletedOnboarding]);
+
+  const loadData = async () => {
+    try {
+      setLoading(true);
+      const [communitiesData, postsData] = await Promise.all([
+        communityService.getCommunities(),
+        postService.getPosts({ communityId: selectedCommunity || undefined }),
+      ]);
+
+      setCommunities(communitiesData);
+      setPosts(postsData);
+    } catch (err: any) {
+      setError(err.response?.data?.detail || 'Error al cargar los datos');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleLogin = async (email: string, password: string) => {
+    try {
+      const user = await authService.login(email, password);
+      setCurrentUser(user);
+    } catch (err: any) {
+      throw new Error(err.response?.data?.detail || 'Error al iniciar sesión');
     }
   };
 
   const handleLogout = () => {
+    authService.logout();
     setCurrentUser(null);
-    setView('home'); // Reset to home view on logout
+    setView('home');
   };
 
-  const handleRegister = (newUserData: { name: string; email: string; role: UserRole; }) => {
-    const newUser: User = {
-      id: `u${Date.now()}`,
-      name: newUserData.name,
-      username: newUserData.name.toLowerCase().replace(/\s/g, '') + Math.floor(Math.random() * 100),
-      avatarUrl: `https://picsum.photos/seed/user${Date.now()}/200/200`,
-      coverImageUrl: 'https://images.unsplash.com/photo-1519389950473-47ba0277781c?q=80&w=1740&auto=format&fit=crop',
-      title: newUserData.role === 'Estudiante' ? 'Nuevo Estudiante' : 'Nuevo Profesor',
-      role: newUserData.role,
-      bio: '¡Hola! Soy nuevo en RAU y estoy listo para aprender y colaborar.',
-      joinedDate: new Date().toLocaleDateString('es-ES', { month: 'long', year: 'numeric' }),
-      communitiesCount: 0,
-      communityIds: [],
-      hasCompletedOnboarding: false, // All users must onboard
-    };
-    setAllUsers(prevUsers => [...prevUsers, newUser]);
+  const handleRegister = async (newUserData: { name: string; email: string; password: string; role: UserRole; }) => {
+    try {
+      await authService.register({
+        email: newUserData.email,
+        password: newUserData.password,
+        nombreCompleto: newUserData.name,
+        rol: newUserData.role,
+      });
+    } catch (err: any) {
+      throw new Error(err.response?.data?.detail || 'Error al registrar usuario');
+    }
   };
-  
-  const handleCompleteOnboarding = (data: OnboardingData) => {
+
+  const handleCompleteOnboarding = async (data: OnboardingData) => {
     if (!currentUser) return;
-    
-    const updatedUser: User = {
-        ...currentUser,
-        careers: data.careers,
-        currentYear: data.year,
-        graduationYear: data.gradYear,
-        communityIds: Array.from(data.communities),
-        communitiesCount: data.communities.size,
-        title: currentUser.role === 'Profesor'
-          ? `Profesor de ${data.careers.join(', ')}`
-          : `${data.year} de ${data.careers[0]}`,
-        bio: currentUser.role === 'Profesor'
-          ? `Profesor de ${data.careers.join(', ')}. Apasionado por la enseñanza y el debate académico. ¡Aquí para ayudar!`
-          : `Estudiante de ${data.careers[0]} cursando el ${data.year}. ¡Listo para aprender y colaborar en RAU!`,
-        hasCompletedOnboarding: true,
-    };
 
-    handleUpdateUser(updatedUser);
-    setNotification("¡Tus preferencias han sido guardadas!");
+    try {
+      await onboardingService.saveOnboarding(data);
+      const updatedUser = await authService.getCurrentUser();
+      setCurrentUser(updatedUser);
+      setNotification('¡Tus preferencias han sido guardadas!');
+    } catch (err: any) {
+      setError(err.response?.data?.detail || 'Error al guardar las preferencias');
+    }
   };
 
-  const handleVote = (postId: string, direction: 'up' | 'down') => {
+  const handleVote = async (postId: string, direction: 'up' | 'down') => {
+    const post = posts.find(p => p.id === postId);
+    if (!post) return;
+
+    const currentStatus = post.voteStatus;
+    let voteValue: 1 | -1 | 0 = direction === 'up' ? 1 : -1;
+
+    if ((currentStatus === 'up' && direction === 'up') || (currentStatus === 'down' && direction === 'down')) {
+      voteValue = 0;
+    }
+
     setPosts(prevPosts =>
       prevPosts.map(p => {
         if (p.id !== postId) return p;
 
-        const currentStatus = p.voteStatus;
         let newUpvotes = p.upvotes;
         let newDownvotes = p.downvotes;
         let newStatus = p.voteStatus;
@@ -111,7 +152,7 @@ function App() {
             if (currentStatus === 'down') newDownvotes -= 1;
             newStatus = 'up';
           }
-        } else { // direction is 'down'
+        } else {
           if (currentStatus === 'down') {
             newDownvotes -= 1;
             newStatus = 'none';
@@ -124,123 +165,164 @@ function App() {
         return { ...p, upvotes: newUpvotes, downvotes: newDownvotes, voteStatus: newStatus };
       })
     );
+
+    try {
+      if (voteValue !== 0) {
+        await postService.votePost(postId, voteValue);
+      }
+    } catch (err: any) {
+      setError(err.response?.data?.detail || 'Error al votar');
+      loadData();
+    }
   };
 
-  const handleAddComment = (postId: string, comment: Comment) => {
-    const updatedPosts = posts.map(p =>
-      p.id === postId ? { ...p, comments: [comment, ...p.comments] } : p
-    );
-    setPosts(updatedPosts);
-    if(selectedPost && selectedPost.id === postId) {
+  const handleAddComment = async (postId: string, comment: Comment) => {
+    try {
+      const result = await commentService.createComment(postId, comment.content);
+
+      setPosts(prevPosts =>
+        prevPosts.map(p => (p.id === postId ? result.post : p))
+      );
+
+      if (selectedPost && selectedPost.id === postId) {
+        setSelectedPost(result.post);
+      }
+    } catch (err: any) {
+      setError(err.response?.data?.detail || 'Error al agregar comentario');
+    }
+  };
+
+  const handleCreatePost = async (postData: { title: string; content: string; communityId: string; tag: PostTag; }) => {
+    if (!currentUser) return;
+
+    try {
+      const newPost = await postService.createPost(postData);
+      setPosts(prevPosts => [newPost, ...prevPosts]);
+      setView('home');
+      setNotification('¡Publicación creada con éxito!');
+    } catch (err: any) {
+      setError(err.response?.data?.detail || 'Error al crear publicación');
+    }
+  };
+
+  const handleCreateCommunity = async (communityData: { name: string; description: string; moderators: User[] }) => {
+    try {
+      const newCommunity = await communityService.createCommunity(communityData);
+      setCommunities(prev => [...prev, newCommunity]);
+      setNotification('¡Comunidad creada con éxito!');
+    } catch (err: any) {
+      setError(err.response?.data?.detail || 'Error al crear comunidad');
+    }
+  };
+
+  const handleUpdateUser = async (updatedUser: User) => {
+    try {
+      const result = await userService.updateUser({
+        avatarUrl: updatedUser.avatarUrl,
+        coverImageUrl: updatedUser.coverImageUrl,
+        title: updatedUser.title,
+        bio: updatedUser.bio,
+      });
+
+      setCurrentUser(result);
+
+      if (selectedUser && selectedUser.id === result.id) {
+        setSelectedUser(result);
+      }
+
+      setNotification('¡Perfil actualizado con éxito!');
+    } catch (err: any) {
+      setError(err.response?.data?.detail || 'Error al actualizar perfil');
+    }
+  };
+
+  const handleDeletePost = async (postId: string) => {
+    try {
+      await postService.deletePost(postId);
+      setPosts(prevPosts => prevPosts.filter(p => p.id !== postId));
+
+      if (selectedPost && selectedPost.id === postId) {
+        setView('home');
+        setSelectedPost(null);
+      }
+
+      setNotification('¡Publicación eliminada con éxito!');
+    } catch (err: any) {
+      setError(err.response?.data?.detail || 'Error al eliminar publicación');
+    }
+  };
+
+  const handleDeleteComment = async (postId: string, commentId: string) => {
+    try {
+      await commentService.deleteComment(postId, commentId);
+
+      const updatedPosts = posts.map(p => {
+        if (p.id !== postId) return p;
+        const updatedComments = p.comments.filter(c => c.id !== commentId);
+        return { ...p, comments: updatedComments };
+      });
+
+      setPosts(updatedPosts);
+
+      if (selectedPost && selectedPost.id === postId) {
         const updatedSelectedPost = updatedPosts.find(p => p.id === postId);
         setSelectedPost(updatedSelectedPost || null);
+      }
+
+      setNotification('¡Comentario eliminado con éxito!');
+    } catch (err: any) {
+      setError(err.response?.data?.detail || 'Error al eliminar comentario');
     }
   };
 
-  const handleCreatePost = (postData: { title: string; content: string; communityId: string; tag: PostTag; }) => {
-    if (!currentUser) return;
-    const community = communities.find(c => c.id === postData.communityId);
-    if (!community) return;
-
-    const newPost: Post = {
-      id: `p-${Date.now()}`,
-      title: postData.title,
-      content: postData.content,
-      author: currentUser,
-      communityId: postData.communityId,
-      communityName: community.name,
-      upvotes: 1,
-      downvotes: 0,
-      comments: [],
-      timestamp: 'Ahora mismo',
-      voteStatus: 'up',
-      tag: postData.tag,
-    };
-    setPosts(prevPosts => [newPost, ...prevPosts]);
-    setView('home');
-  };
-
-  const handleCreateCommunity = (communityData: { name: string; description: string; moderators: User[] }) => {
-    const newCommunity: Community = {
-      id: `c${Date.now()}`,
-      name: communityData.name,
-      description: communityData.description,
-      memberCount: communityData.moderators.length,
-      icon: 'Book', // Default icon for new communities
-    };
-    setCommunities(prev => [...prev, newCommunity]);
-    setNotification('¡Comunidad creada con éxito!');
-  };
-
-  const handleUpdateUser = (updatedUser: User) => {
-    setAllUsers(prevUsers => 
-        prevUsers.map(u => u.id === updatedUser.id ? updatedUser : u)
-    );
-    if (currentUser && currentUser.id === updatedUser.id) {
-        setCurrentUser(updatedUser);
-    }
-    setPosts(prevPosts =>
-      prevPosts.map(p => {
-        const newAuthor = p.author.id === updatedUser.id ? updatedUser : p.author;
-        const newComments = p.comments.map(c => {
-            const newCommentAuthor = c.author.id === updatedUser.id ? updatedUser : c.author;
-            return { ...c, author: newCommentAuthor };
-        });
-        return { ...p, author: newAuthor, comments: newComments };
-      })
-    );
-    if (selectedUser && selectedUser.id === updatedUser.id) {
-        setSelectedUser(updatedUser);
-    }
-    setNotification('¡Perfil actualizado con éxito!');
-  };
-
-  const handleDeletePost = (postId: string) => {
-    setPosts(prevPosts => prevPosts.filter(p => p.id !== postId));
-    if (selectedPost && selectedPost.id === postId) {
-      setView('home');
-      setSelectedPost(null);
+  const handleSelectPost = async (post: Post) => {
+    try {
+      const fullPost = await postService.getPost(post.id);
+      setSelectedPost(fullPost);
+      setView('post');
+    } catch (err: any) {
+      setError(err.response?.data?.detail || 'Error al cargar publicación');
     }
   };
 
-  const handleDeleteComment = (postId: string, commentId: string) => {
-    const updatedPosts = posts.map(p => {
-      if (p.id !== postId) return p;
-      const updatedComments = p.comments.filter(c => c.id !== commentId);
-      return { ...p, comments: updatedComments };
-    });
-    setPosts(updatedPosts);
-    
-    if (selectedPost && selectedPost.id === postId) {
-      const updatedSelectedPost = updatedPosts.find(p => p.id === postId);
-      setSelectedPost(updatedSelectedPost || null);
-    }
-  };
-
-  const handleSelectPost = (post: Post) => {
-    setSelectedPost(post);
-    setView('post');
-  };
-
-  const handleSelectCommunity = (communityId: string) => {
+  const handleSelectCommunity = async (communityId: string) => {
     setSelectedCommunity(communityId);
     setSelectedPost(null);
     setSelectedUser(null);
     setView('home');
+
+    try {
+      const postsData = await postService.getPosts({ communityId });
+      setPosts(postsData);
+    } catch (err: any) {
+      setError(err.response?.data?.detail || 'Error al cargar publicaciones');
+    }
   };
 
-  const handleSelectUser = (user: User) => {
-    setSelectedUser(user);
-    setSelectedPost(null);
-    setView('profile');
+  const handleSelectUser = async (user: User) => {
+    try {
+      const fullUser = await userService.getUser(user.id);
+      setSelectedUser(fullUser);
+      setSelectedPost(null);
+      setView('profile');
+    } catch (err: any) {
+      setError(err.response?.data?.detail || 'Error al cargar perfil');
+    }
   };
 
-  const handleLogoClick = () => {
+  const handleLogoClick = async () => {
     setSelectedCommunity(null);
     setSelectedPost(null);
     setSelectedUser(null);
     setSearchQuery('');
     setView('home');
+
+    try {
+      const postsData = await postService.getPosts();
+      setPosts(postsData);
+    } catch (err: any) {
+      setError(err.response?.data?.detail || 'Error al cargar publicaciones');
+    }
   };
 
   const filteredPosts = useMemo(() => {
@@ -256,7 +338,7 @@ function App() {
       })
       .sort((a, b) => (b.upvotes - b.downvotes) - (a.upvotes - a.downvotes));
   }, [posts, selectedCommunity, searchQuery]);
-  
+
   if (!currentUser) {
     return <Login onLogin={handleLogin} onRegister={handleRegister} />;
   }
@@ -264,12 +346,12 @@ function App() {
   if (!currentUser.hasCompletedOnboarding) {
     return <Onboarding currentUser={currentUser} onComplete={handleCompleteOnboarding} communities={communities} />;
   }
-  
+
   const renderContent = () => {
     if (loading) {
       return <div className="text-center p-8">Cargando contenido...</div>;
     }
-    
+
     switch (view) {
       case 'post':
         if (!selectedPost) return <div>Post no encontrado.</div>;
@@ -277,9 +359,9 @@ function App() {
       case 'profile':
         if (!selectedUser) return <div>Usuario no encontrado.</div>;
         const userPosts = posts.filter(p => p.author.id === selectedUser.id);
-        return <Profile 
-            user={selectedUser} 
-            currentUser={currentUser} 
+        return <Profile
+            user={selectedUser}
+            currentUser={currentUser}
             posts={userPosts}
             onVote={handleVote}
             onSelectPost={handleSelectPost}
@@ -313,9 +395,9 @@ function App() {
         onSearchChange={setSearchQuery}
       />
       {notification && (
-        <SuccessNotification 
-          message={notification} 
-          onClose={() => setNotification(null)} 
+        <SuccessNotification
+          message={notification}
+          onClose={() => setNotification(null)}
         />
       )}
       <main className="max-w-7xl mx-auto pt-20 px-2 sm:px-4 lg:px-8">
