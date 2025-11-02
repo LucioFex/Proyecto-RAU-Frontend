@@ -11,11 +11,11 @@ export const communityService = {
     const response = await api.get('/communities', { params });
 
     return response.data.map((c: any) => ({
-      id: c.comunidad_id,
-      name: c.nombre,
-      description: c.descripcion,
-      memberCount: c.miembros_count || 0,
-      icon: this.mapIconFromDescription(c.descripcion),
+      id: c.id ?? c.comunidad_id,
+      name: c.name ?? c.nombre,
+      description: c.description ?? c.descripcion,
+      memberCount: c.member_count ?? c.miembros_count ?? 0,
+      icon: this.mapIconFromDescription(c.description ?? c.descripcion),
     }));
   },
 
@@ -25,17 +25,17 @@ export const communityService = {
     moderators: User[];
   }): Promise<Community> {
     const response = await api.post('/communities', {
-      nombre: data.name,
-      descripcion: data.description,
+      name: data.name,
+      description: data.description,
     });
 
     const c = response.data;
     return {
-      id: c.comunidad_id,
-      name: c.nombre,
-      description: c.descripcion,
-      memberCount: c.miembros_count || 1,
-      icon: this.mapIconFromDescription(c.descripcion),
+      id: c.id ?? c.comunidad_id,
+      name: c.name ?? c.nombre,
+      description: c.description ?? c.descripcion,
+      memberCount: c.member_count ?? c.miembros_count ?? 1,
+      icon: this.mapIconFromDescription(c.description ?? c.descripcion),
     };
   },
 

@@ -36,9 +36,9 @@ export const postService = {
   }): Promise<Post> {
     const response = await api.post('/posts', {
       community_id: data.communityId,
-      titulo: data.title,
-      cuerpo: data.content,
-      etiqueta: data.tag,
+      title: data.title,
+      body: data.content,
+      tag: data.tag,
     });
 
     return this.mapPost(response.data);
@@ -66,44 +66,89 @@ export const postService = {
 
   mapPost(p: any): Post {
     return {
-      id: p.post_id,
-      title: p.titulo,
-      content: p.cuerpo,
-      author: this.mapUser(p.autor),
-      communityId: p.comunidad_id,
-      communityName: p.comunidad?.nombre || 'Comunidad',
-      upvotes: p.votos_positivos || 0,
-      downvotes: p.votos_negativos || 0,
-      comments: p.comentarios ? p.comentarios.map((c: any) => this.mapComment(c)) : [],
-      timestamp: this.formatTimestamp(p.fecha_creacion),
-      voteStatus: p.voto_usuario === 1 ? 'up' : p.voto_usuario === -1 ? 'down' : 'none',
-      tag: (p.etiqueta || 'Pregunta') as PostTag,
+      id: p.id ?? p.post_id,
+      title: p.title ?? p.titulo,
+      content: p.content ?? p.cuerpo,
+      author: this.mapUser(p.author ?? p.autor),
+      communityId: p.community_id ?? p.comunidad_id,
+      communityName:
+        p.community?.name ??
+        p.community?.nombre ??
+        p.comunidad?.nombre ??
+        'Comunidad',
+      upvotes: p.upvotes ?? p.votos_positivos ?? 0,
+      downvotes: p.downvotes ?? p.votos_negativos ?? 0,
+      comments: p.comments
+        ? p.comments.map((c: any) => this.mapComment(c))
+        : p.comentarios
+        ? p.comentarios.map((c: any) => this.mapComment(c))
+        : [],
+      timestamp: this.formatTimestamp(
+        p.created_at ?? p.fecha_creacion ?? new Date().toISOString()
+      ),
+      voteStatus:
+        p.vote_status ??
+        (p.voto_usuario === 1
+          ? 'up'
+          : p.voto_usuario === -1
+          ? 'down'
+          : 'none'),
+      tag: (p.tag ?? p.etiqueta ?? 'Pregunta') as PostTag,
     };
   },
 
   mapComment(c: any): Comment {
     return {
-      id: c.comentario_id,
-      author: this.mapUser(c.autor),
-      content: c.cuerpo,
-      timestamp: this.formatTimestamp(c.fecha_creacion),
+      id: c.id ?? c.comentario_id,
+      author: this.mapUser(c.author ?? c.autor),
+      content: c.content ?? c.cuerpo,
+      timestamp: this.formatTimestamp(
+        c.created_at ?? c.fecha_creacion ?? new Date().toISOString()
+      ),
     };
   },
 
   mapUser(u: any): User {
+    const id = u.id ?? u.usuario_id;
+    const name = u.name ?? u.nombreCompleto;
+    const username = u.username ?? '';
+    const role = (u.role ?? u.rol) as 'Profesor' | 'Estudiante';
+    const avatarUrl =
+      u.avatar_url ?? `https://picsum.photos/seed/user${id}/200/200`;
+    const coverImageUrl =
+      u.cover_image_url ??
+      'https://images.unsplash.com/photo-1519389950473-47ba0277781c?q=80&w=1740&auto=format&fit=crop';
+    const title =
+      u.title ??
+      u.titulo ??
+      (role === 'Profesor' ? 'Profesor' : 'Estudiante');
+    const bio = u.bio ?? '';
+    const joinedRaw = u.created_at ?? u.fecha_registro;
+    const joinedDate = joinedRaw
+      ? new Date(joinedRaw).toLocaleDateString('es-ES', {
+          month: 'long',
+          year: 'numeric',
+        })
+      : '';
+    const communitiesCount =
+      u.member_count ?? u.comunidades_count ?? 0;
+    const communityIds = u.community_ids ?? u.comunidad_ids ?? [];
+    const hasCompletedOnboarding =
+      u.onboarding_completed ?? u.onboarding_completado ?? false;
+
     return {
-      id: u.usuario_id,
-      name: u.nombreCompleto,
-      username: u.username,
-      avatarUrl: u.avatar_url || `https://picsum.photos/seed/user${u.usuario_id}/200/200`,
-      coverImageUrl: u.cover_image_url || 'https://images.unsplash.com/photo-1519389950473-47ba0277781c?q=80&w=1740&auto=format&fit=crop',
-      title: u.titulo || (u.rol === 'Profesor' ? 'Profesor' : 'Estudiante'),
-      role: u.rol as 'Profesor' | 'Estudiante',
-      bio: u.bio || '',
-      joinedDate: u.fecha_registro ? new Date(u.fecha_registro).toLocaleDateString('es-ES', { month: 'long', year: 'numeric' }) : '',
-      communitiesCount: u.comunidades_count || 0,
-      communityIds: u.comunidad_ids || [],
-      hasCompletedOnboarding: u.onboarding_completado || false,
+      id,
+      name,
+      username,
+      avatarUrl,
+      coverImageUrl,
+      title,
+      role,
+      bio,
+      joinedDate,
+      communitiesCount,
+      communityIds,
+      hasCompletedOnboarding,
     };
   },
 
