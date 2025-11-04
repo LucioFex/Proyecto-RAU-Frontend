@@ -2,14 +2,12 @@ import React, { useState, useMemo, useEffect } from 'react';
 import type { Community, User } from '../types';
 import { Logo } from './icons/Logo';
 import { Combobox } from './Combobox';
-import {
-  AtomIcon,
-  BeakerIcon,
-  BookIcon,
-  CodeIcon,
-  HistoryIcon,
-  SigmaIcon,
-} from './icons';
+import { AtomIcon } from './icons/AtomIcon';
+import { BeakerIcon } from './icons/BeakerIcon';
+import { BookIcon } from './icons/BookIcon';
+import { CodeIcon } from './icons/CodeIcon';
+import { HistoryIcon } from './icons/HistoryIcon';
+import { SigmaIcon } from './icons/SigmaIcon';
 import { optionsService } from '../services';
 
 export interface OnboardingData {
