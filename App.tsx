@@ -126,9 +126,16 @@ function App() {
     if (!currentUser) return;
 
     try {
+      // Guarda las preferencias de onboarding en el backend
       await onboardingService.saveOnboarding(data);
-      const updatedUser = await authService.getCurrentUser();
-      setCurrentUser(updatedUser);
+
+      // Marca al usuario actual como que ha completado el onboarding
+      // y refresca los datos necesarios
+      setCurrentUser({ ...currentUser, hasCompletedOnboarding: true });
+
+      // Opcional: carga datos iniciales ahora que el onboarding terminó
+      await loadData();
+
       setNotification('¡Tus preferencias han sido guardadas!');
     } catch (err: any) {
       setError(err.response?.data?.detail || 'Error al guardar las preferencias');
