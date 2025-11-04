@@ -34,11 +34,12 @@ export const postService = {
     communityId: string;
     tag: PostTag;
   }): Promise<Post> {
+    // Enviar claves en inglés para que el backend no falle
     const response = await api.post('/posts', {
       community_id: data.communityId,
-      titulo: data.title,
-      cuerpo: data.content,
-      etiqueta: data.tag,
+      title: data.title,
+      body: data.content,
+      tag: data.tag,
     });
 
     return this.mapPost(response.data);

@@ -45,10 +45,19 @@ function App() {
         if (storedUser) {
           try {
             const user = await authService.getCurrentUser();
-            setCurrentUser(user);
+            // consulta si ya completó el onboarding
+            let done = false;
+            try {
+              const onboardingState = await onboardingService.getOnboarding();
+              done = !!onboardingState.done;
+            } catch {
+              done = false;
+            }
+            const updatedUser = { ...user, hasCompletedOnboarding: done };
+            setCurrentUser(updatedUser);
+            localStorage.setItem('current_user', JSON.stringify(updatedUser));
 
-            // NUEVO: si el usuario no ha completado el onboarding, carga las comunidades
-            if (!user.hasCompletedOnboarding) {
+            if (!done) {
               const communitiesData = await communityService.getCommunities();
               setCommunities(communitiesData);
             }
@@ -62,7 +71,6 @@ function App() {
         setLoading(false);
       }
     };
-
     initializeApp();
   }, []);
 
@@ -92,7 +100,17 @@ function App() {
   const handleLogin = async (email: string, password: string) => {
     try {
       const user = await authService.login(email, password);
-      setCurrentUser(user);
+      // tras el login consultamos si completó el onboarding
+      let done = false;
+      try {
+        const onboardingState = await onboardingService.getOnboarding();
+        done = !!onboardingState.done;
+      } catch {
+        done = false;
+      }
+      const updatedUser = { ...user, hasCompletedOnboarding: done };
+      setCurrentUser(updatedUser);
+      localStorage.setItem('current_user', JSON.stringify(updatedUser));
     } catch (err: any) {
       throw new Error(err.response?.data?.detail || 'Error al iniciar sesión');
     }
@@ -124,18 +142,13 @@ function App() {
 
   const handleCompleteOnboarding = async (data: OnboardingData) => {
     if (!currentUser) return;
-
     try {
-      // Guarda las preferencias de onboarding en el backend
+      // guarda preferencias con números convertidos
       await onboardingService.saveOnboarding(data);
-
-      // Marca al usuario actual como que ha completado el onboarding
-      // y refresca los datos necesarios
-      setCurrentUser({ ...currentUser, hasCompletedOnboarding: true });
-
-      // Opcional: carga datos iniciales ahora que el onboarding terminó
-      await loadData();
-
+      const updated = { ...currentUser, hasCompletedOnboarding: true };
+      setCurrentUser(updated);
+      localStorage.setItem('current_user', JSON.stringify(updated));
+      await loadData();  // recarga posts y comunidades
       setNotification('¡Tus preferencias han sido guardadas!');
     } catch (err: any) {
       setError(err.response?.data?.detail || 'Error al guardar las preferencias');

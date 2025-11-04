@@ -14,13 +14,23 @@ export const onboardingService = {
   },
 
   async saveOnboarding(data: OnboardingData): Promise<any> {
-    const response = await api.post('/onboarding', {
-      carreras: data.careers,
-      anio_actual: data.year,
-      anio_graduacion: data.gradYear,
-      comunidad_ids: Array.from(data.communities),
-    });
+    // extraer el número del año académico (por ejemplo '2º Año' -> 2)
+    let yearNum: number | undefined = undefined;
+    if (data.year) {
+      const match = data.year.match(/\d+/);
+      if (match) {
+        yearNum = parseInt(match[0], 10);
+      }
+    }
+    // convertir el año de graduación a número
+    const gradYearNum = data.gradYear ? parseInt(data.gradYear, 10) : undefined;
 
+    const response = await api.post('/onboarding', {
+      careers: data.careers,
+      year: yearNum,
+      graduation_year: gradYearNum,
+      favorite_communities: Array.from(data.communities),
+    });
     return response.data;
   },
 };
