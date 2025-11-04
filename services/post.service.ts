@@ -65,45 +65,158 @@ export const postService = {
   },
 
   mapPost(p: any): Post {
+    // identificar campos tanto en español como en inglés
+    const id = p.post_id ?? p.id;
+    const title = p.titulo ?? p.title;
+    const content = p.cuerpo ?? p.body ?? p.content;
+    const communityId = p.comunidad_id ?? p.community_id;
+    const communityName =
+      p.comunidad?.nombre ??
+      p.community?.name ??
+      'Comunidad';
+    const upvotes = p.votos_positivos ?? p.upvotes ?? 0;
+    const downvotes = p.votos_negativos ?? p.downvotes ?? 0;
+    const commentsArr = p.comentarios ?? p.comments ?? [];
+    const authorObj = p.autor ?? p.author;
+    let author: User;
+
+    if (authorObj) {
+      // si existe objeto autor/autora, mapearlo
+      author = this.mapUser(authorObj);
+    } else {
+      // fallback: crear un usuario básico si solo hay author_id
+      const uid = p.autor_id ?? p.author_id;
+      author = {
+        id: uid ?? '',
+        name: '',
+        username: '',
+        avatarUrl: uid
+          ? `https://picsum.photos/seed/user${uid}/200/200`
+          : `https://picsum.photos/200/200`,
+        coverImageUrl:
+          'https://images.unsplash.com/photo-1519389950473-47ba0277781c?q=80&w=1740&auto=format&fit=crop',
+        title: '',
+        role: 'Estudiante',
+        bio: '',
+        joinedDate: '',
+        communitiesCount: 0,
+        communityIds: [],
+        hasCompletedOnboarding: false,
+      };
+    }
+
+    const timestampStr = p.fecha_creacion ?? p.created_at ?? '';
+    const voteStatus =
+      p.voto_usuario === 1
+        ? 'up'
+        : p.voto_usuario === -1
+        ? 'down'
+        : p.vote_status ?? 'none';
+    const tag = (p.etiqueta ?? p.tag ?? 'Pregunta') as PostTag;
+
     return {
-      id: p.post_id,
-      title: p.titulo,
-      content: p.cuerpo,
-      author: this.mapUser(p.autor),
-      communityId: p.comunidad_id,
-      communityName: p.comunidad?.nombre || 'Comunidad',
-      upvotes: p.votos_positivos || 0,
-      downvotes: p.votos_negativos || 0,
-      comments: p.comentarios ? p.comentarios.map((c: any) => this.mapComment(c)) : [],
-      timestamp: this.formatTimestamp(p.fecha_creacion),
-      voteStatus: p.voto_usuario === 1 ? 'up' : p.voto_usuario === -1 ? 'down' : 'none',
-      tag: (p.etiqueta || 'Pregunta') as PostTag,
+      id,
+      title,
+      content,
+      author,
+      communityId,
+      communityName,
+      upvotes,
+      downvotes,
+      comments: commentsArr.map((c: any) => this.mapComment(c)),
+      timestamp: this.formatTimestamp(timestampStr),
+      voteStatus,
+      tag,
     };
   },
 
   mapComment(c: any): Comment {
+    const id = c.comentario_id ?? c.id;
+    const content = c.cuerpo ?? c.body;
+    const timestampStr = c.fecha_creacion ?? c.created_at ?? '';
+    const authorObj = c.autor ?? c.author;
+    let author: User;
+
+    if (authorObj) {
+      author = this.mapUser(authorObj);
+    } else {
+      const uid = c.autor_id ?? c.author_id;
+      author = {
+        id: uid ?? '',
+        name: '',
+        username: '',
+        avatarUrl: uid
+          ? `https://picsum.photos/seed/user${uid}/200/200`
+          : `https://picsum.photos/200/200`,
+        coverImageUrl:
+          'https://images.unsplash.com/photo-1519389950473-47ba0277781c?q=80&w=1740&auto=format&fit=crop',
+        title: '',
+        role: 'Estudiante',
+        bio: '',
+        joinedDate: '',
+        communitiesCount: 0,
+        communityIds: [],
+        hasCompletedOnboarding: false,
+      };
+    }
+
     return {
-      id: c.comentario_id,
-      author: this.mapUser(c.autor),
-      content: c.cuerpo,
-      timestamp: this.formatTimestamp(c.fecha_creacion),
+      id,
+      author,
+      content,
+      timestamp: this.formatTimestamp(timestampStr),
     };
   },
 
   mapUser(u: any): User {
+    const id = u.usuario_id ?? u.id;
+    const name = u.nombreCompleto ?? u.name ?? '';
+    const username = u.username ?? '';
+    const avatarUrl =
+      u.avatar_url ??
+      (id
+        ? `https://picsum.photos/seed/user${id}/200/200`
+        : 'https://picsum.photos/200/200');
+    const coverImageUrl =
+      u.cover_image_url ??
+      'https://images.unsplash.com/photo-1519389950473-47ba0277781c?q=80&w=1740&auto=format&fit=crop';
+    const title =
+      u.titulo ??
+      u.title ??
+      (u.rol || u.role) === 'Profesor'
+        ? 'Profesor'
+        : 'Estudiante';
+    const role = (u.rol ?? u.role) as 'Profesor' | 'Estudiante';
+    const bio = u.bio ?? '';
+    const joinedRaw = u.fecha_registro ?? u.created_at;
+    const joinedDate = joinedRaw
+      ? new Date(joinedRaw).toLocaleDateString('es-ES', {
+          month: 'long',
+          year: 'numeric',
+        })
+      : '';
+    const communitiesCount =
+      u.comunidades_count ?? u.member_count ?? 0;
+    const communityIds =
+      u.comunidad_ids ?? u.community_ids ?? [];
+    const hasCompletedOnboarding =
+      u.onboarding_completado ??
+      u.hasCompletedOnboarding ??
+      false;
+
     return {
-      id: u.usuario_id,
-      name: u.nombreCompleto,
-      username: u.username,
-      avatarUrl: u.avatar_url || `https://picsum.photos/seed/user${u.usuario_id}/200/200`,
-      coverImageUrl: u.cover_image_url || 'https://images.unsplash.com/photo-1519389950473-47ba0277781c?q=80&w=1740&auto=format&fit=crop',
-      title: u.titulo || (u.rol === 'Profesor' ? 'Profesor' : 'Estudiante'),
-      role: u.rol as 'Profesor' | 'Estudiante',
-      bio: u.bio || '',
-      joinedDate: u.fecha_registro ? new Date(u.fecha_registro).toLocaleDateString('es-ES', { month: 'long', year: 'numeric' }) : '',
-      communitiesCount: u.comunidades_count || 0,
-      communityIds: u.comunidad_ids || [],
-      hasCompletedOnboarding: u.onboarding_completado || false,
+      id,
+      name,
+      username,
+      avatarUrl,
+      coverImageUrl,
+      title,
+      role,
+      bio,
+      joinedDate,
+      communitiesCount,
+      communityIds,
+      hasCompletedOnboarding,
     };
   },
 
@@ -116,11 +229,17 @@ export const postService = {
     const diffDays = Math.floor(diffHours / 24);
 
     if (diffMins < 1) return 'Ahora mismo';
-    if (diffMins < 60) return `Hace ${diffMins} minuto${diffMins > 1 ? 's' : ''}`;
-    if (diffHours < 24) return `Hace ${diffHours} hora${diffHours > 1 ? 's' : ''}`;
+    if (diffMins < 60)
+      return `Hace ${diffMins} minuto${diffMins > 1 ? 's' : ''}`;
+    if (diffHours < 24)
+      return `Hace ${diffHours} hora${diffHours > 1 ? 's' : ''}`;
     if (diffDays === 1) return 'Hace 1 día';
     if (diffDays < 7) return `Hace ${diffDays} días`;
 
-    return date.toLocaleDateString('es-ES', { day: 'numeric', month: 'short', year: 'numeric' });
+    return date.toLocaleDateString('es-ES', {
+      day: 'numeric',
+      month: 'short',
+      year: 'numeric',
+    });
   },
 };
