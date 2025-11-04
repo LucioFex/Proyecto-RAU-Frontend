@@ -74,6 +74,7 @@ export const postService = {
     const communityName =
       p.comunidad?.nombre ??
       p.community?.name ??
+      p.community_name ??
       'Comunidad';
     const upvotes = p.votos_positivos ?? p.upvotes ?? 0;
     const downvotes = p.votos_negativos ?? p.downvotes ?? 0;
