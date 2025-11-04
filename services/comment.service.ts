@@ -9,8 +9,8 @@ export const commentService = {
     parentCommentId?: string
   ): Promise<{ comment: Comment; post: Post }> {
     const response = await api.post(`/posts/${postId}/comments`, {
-      content: content,
-      parent_id: parentCommentId || null,
+      cuerpo: content,
+      comentario_padre_id: parentCommentId || null,
     });
 
     return {

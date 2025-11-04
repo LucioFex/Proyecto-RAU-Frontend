@@ -12,9 +12,11 @@ interface JoinCommunityModalProps {
   isOpen: boolean;
   onClose: () => void;
   communities: Community[];
+  /** Callback que ejecuta la acción de unirse en el backend */
+  onJoin: (communityId: string) => Promise<void>;
 }
 
-const iconMap: { [key: string]: React.FC<{className?: string}> } = {
+const iconMap: { [key: string]: React.FC<{ className?: string }> } = {
   Sigma: SigmaIcon,
   Atom: AtomIcon,
   Code: CodeIcon,
@@ -23,23 +25,36 @@ const iconMap: { [key: string]: React.FC<{className?: string}> } = {
   History: HistoryIcon,
 };
 
-export const JoinCommunityModal: React.FC<JoinCommunityModalProps> = ({ isOpen, onClose, communities }) => {
+export const JoinCommunityModal: React.FC<JoinCommunityModalProps> = ({
+  isOpen,
+  onClose,
+  communities,
+  onJoin,
+}) => {
+  // Seguimos usando un set local para deshabilitar botones, pero ahora
+  // la acción real se delega en onJoin.
   const [joinedCommunities, setJoinedCommunities] = useState<Set<string>>(new Set());
 
   if (!isOpen) return null;
 
-  const handleJoin = (communityId: string) => {
-    setJoinedCommunities(prev => new Set(prev).add(communityId));
+  const handleJoin = async (communityId: string) => {
+    try {
+      await onJoin(communityId);
+      // Marcamos como unida localmente para deshabilitar el botón
+      setJoinedCommunities((prev) => new Set(prev).add(communityId));
+    } catch (err) {
+      console.error('Error al unirse a la comunidad', err);
+    }
   };
 
   return (
-    <div 
+    <div
       className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50"
       onClick={onClose}
     >
-      <div 
+      <div
         className="bg-white rounded-lg shadow-xl w-full max-w-2xl max-h-[80vh] flex flex-col"
-        onClick={e => e.stopPropagation()}
+        onClick={(e) => e.stopPropagation()}
       >
         <div className="flex justify-between items-center p-4 border-b">
           <h2 className="text-xl font-bold text-slate-800">Unirse a una Comunidad</h2>
@@ -49,7 +64,7 @@ export const JoinCommunityModal: React.FC<JoinCommunityModalProps> = ({ isOpen, 
         </div>
         <div className="overflow-y-auto p-4">
           <ul className="space-y-3">
-            {communities.map(community => {
+            {communities.map((community) => {
               const IconComponent = iconMap[community.icon] || BookIcon;
               const isJoined = joinedCommunities.has(community.id);
               return (
@@ -61,12 +76,12 @@ export const JoinCommunityModal: React.FC<JoinCommunityModalProps> = ({ isOpen, 
                       <p className="text-sm text-slate-500">{community.memberCount} miembros</p>
                     </div>
                   </div>
-                  <button 
+                  <button
                     onClick={() => handleJoin(community.id)}
                     disabled={isJoined}
                     className={`px-4 py-1.5 text-sm font-semibold rounded-md transition-all ${
-                      isJoined 
-                        ? 'bg-slate-200 text-slate-500 cursor-default' 
+                      isJoined
+                        ? 'bg-slate-200 text-slate-500 cursor-default'
                         : 'bg-blue-500 text-white hover:bg-blue-600'
                     }`}
                   >
