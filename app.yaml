@@ -1,0 +1,22 @@
+service: rau-frontend
+
+# Use the Node.js 20 runtime
+runtime: nodejs20
+
+# The instance class determines the amount of memory and CPU your application has.
+# F1 is the smallest and most cost-effective, suitable for a frontend.
+instance_class: F1
+
+# Set environment variables for your application.
+env_variables:
+  VITE_API_URL: "https://test-proj-beltrangs.ue.r.appspot.com" # Replace with your deployed backend URL
+
+# This entrypoint is optional if you have a `start` script in package.json,
+# but it makes the intent clear. App Engine will run `npm start`.
+entrypoint: npm start
+
+# Direct all incoming traffic to your Node.js application.
+# Your `serve` package will handle routing and serving static files.
+handlers:
+- url: /.*
+  script: auto
