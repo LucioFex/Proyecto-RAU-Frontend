@@ -1,10 +1,38 @@
-# Proyecto-final-equipo-2---ININF-2025---Frontend
+# 🚀 RAU Frontend
 
-## Ejecucion Local
+Frontend del proyecto **RAU** (Red Académica Universitaria), desarrollado con **React** y **Typescript**.
 
-**Prerequisitos:**  Node.js
+---
 
-1. Instalar las dependencias:
-   `npm install`
-2. Ejecutar la app:
-   `npm run dev`
+## ⚙️ Requisitos
+
+- NodeJS
+
+---
+
+## 🧩 Instalar las dependencias
+
+```bash
+git clone https://github.com/LucioFex/Proyecto-RAU-Backend.git
+cd Proyecto-RAU-Frontend
+npm install
+```
+
+## ▶️ Ejecutar la app
+
+### Modo desarrollo (con recarga automática):
+
+```bash
+npm run dev
+```
+### Modo productivo - No disponible:
+
+```bash
+TBD
+```
+
+### 🧪 Correr tests - No disponible:
+```bash
+TBD
+```
+
